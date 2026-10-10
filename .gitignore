@@ -1,0 +1,13 @@
+# 05_full_pipeline.R
+# Full DEG workflow for GDS5211
+
+cat("=== GDS5211 DEG Analysis Pipeline ===\n")
+
+source("requirements.R")
+source("01_download_and_explore.R")
+source("02_preprocessing_normalization.R")
+source("03_deg_analysis.R")
+source("04_visualization.R")
+
+cat("\nPipeline completed successfully!\n")
+cat("Check the results folder for plots and tables.\n")
