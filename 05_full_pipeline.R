@@ -1,104 +1,147 @@
-# 04_visualization.R
-# Visualization of DEGs for GDS5211
+#!/usr/bin/env Rscript
+# ============================================================================
+# 05_FULL_PIPELINE.R - Complete DEG Analysis Workflow for GDS5211
+# ============================================================================
+# This script executes the entire analysis pipeline in sequence
+# ============================================================================
 
-suppressPackageStartupMessages({
-  library(ggplot2)
-  library(pheatmap)
-  library(limma)
-  library(dplyr)
+cat("\n")
+cat("╔════════════════════════════════════════════════════════════════╗\n")
+cat("║          GDS5211 Microarray DEG Analysis Pipeline             ║\n")
+cat("║                    Complete Workflow                          ║\n")
+cat("╚════════════════════════════════════════════════════════════════╝\n")
+cat("\n")
+
+start_time <- Sys.time()
+
+tryCatch({
+  # Load configuration and setup
+  cat("Loading configuration...\n")
+  source("00_setup.R")
+  
+  # Check for required packages
+  cat("\nChecking dependencies...\n")
+  required_packages <- c("GEOquery", "limma", "ggplot2", "pheatmap", "dplyr")
+  missing_packages <- required_packages[!sapply(required_packages, require, character.only = TRUE)]
+  
+  if (length(missing_packages) > 0) {
+    cat("\nWARNING: Missing packages:", paste(missing_packages, collapse = ", "), "\n")
+    cat("Please run requirements.R to install dependencies.\n")
+    stop("Dependencies not installed.")
+  }
+  
+  cat("✓ All dependencies available\n")
+  
+  # Execute analysis steps
+  cat("\n--- Executing Analysis Pipeline ---\n\n")
+  
+  # Step 1: Download and Explore
+  source("01_download_and_explore.R")
+  
+  # Step 2: Preprocessing and Normalization
+  source("02_preprocessing_normalization.R")
+  
+  # Step 3: Differential Expression Analysis
+  source("03_deg_analysis.R")
+  
+  # Step 4: Visualization
+  source("04_visualization.R")
+  
+  # ========================================================================
+  # Generate Summary Report
+  # ========================================================================
+  
+  cat("\n\n========================================")
+  cat("\n=== GENERATING FINAL REPORT ===")
+  cat("\n========================================\n")
+  
+  end_time <- Sys.time()
+  elapsed_time <- difftime(end_time, start_time, units = "mins")
+  
+  # Load final results
+  deg_results <- readRDS("results/data/deg_results.rds")
+  expr <- readRDS("results/data/gds5211_expression_matrix.rds")
+  
+  # Create summary report
+  report <- paste0(
+    "\n╔════════════════════════════════════════════════════════════════╗\n",
+    "║                    ANALYSIS SUMMARY REPORT                    ║\n",
+    "║                  GDS5211 Microarray DEG Study                 ║\n",
+    "╚════════════════════════════════════════════════════════════════╝\n",
+    "\n",
+    "DATASET INFORMATION:\n",
+    "  Accession ID: ", CONFIG$gds_accession, "\n",
+    "  Source: NCBI Gene Expression Omnibus (GEO)\n",
+    "  Platform: Microarray\n",
+    "\n",
+    "DATA DIMENSIONS:\n",
+    "  Samples: ", ncol(expr), "\n",
+    "  Genes analyzed: ", nrow(deg_results), "\n",
+    "\n",
+    "ANALYSIS PARAMETERS:\n",
+    "  Log2 Fold Change threshold: > ", CONFIG$fc_threshold, "\n",
+    "  P-value threshold: < ", CONFIG$p_threshold, "\n",
+    "  FDR (q-value) threshold: < ", CONFIG$q_threshold, "\n",
+    "\n",
+    "DEG STATISTICS:\n",
+    "  Total significant DEGs: ", sum(deg_results$Significant == "Yes"), "\n",
+    "  Upregulated genes: ", sum(deg_results$Direction == "Upregulated"), "\n",
+    "  Downregulated genes: ", sum(deg_results$Direction == "Downregulated"), "\n",
+    "  Not significant: ", sum(deg_results$Direction == "Not Significant"), "\n",
+    "\n",
+    "OUTPUT FILES GENERATED:\n",
+    "\n",
+    "TABLES:\n",
+    "  • results/tables/01_sample_expression_summary.csv\n",
+    "  • results/tables/02_deg_results_complete.csv\n",
+    "  • results/tables/03_top_upregulated_genes.csv\n",
+    "  • results/tables/04_top_downregulated_genes.csv\n",
+    "\n",
+    "QUALITY CONTROL PLOTS:\n",
+    "  • results/plots/quality_control/01_boxplot_raw_expression.png\n",
+    "  • results/plots/quality_control/02_density_raw_expression.png\n",
+    "  • results/plots/quality_control/03_sample_correlation.png\n",
+    "\n",
+    "DEG ANALYSIS PLOTS:\n",
+    "  • results/plots/deg_analysis/01_volcano_plot.png\n",
+    "  • results/plots/deg_analysis/02_heatmap_top_degs.png\n",
+    "  • results/plots/deg_analysis/03_ma_plot.png\n",
+    "  • results/plots/deg_analysis/04_boxplot_gene_*.png\n",
+    "  • results/plots/deg_analysis/05_pca_plot.png\n",
+    "  • results/plots/deg_analysis/06_logfc_distribution.png\n",
+    "  • results/plots/deg_analysis/07_pvalue_distribution.png\n",
+    "  • results/plots/deg_analysis/08_deg_summary_barplot.png\n",
+    "\n",
+    "DATA OBJECTS:\n",
+    "  • results/data/gds5211_expression_matrix.rds\n",
+    "  • results/data/gds5211_phenotype.rds\n",
+    "  • results/data/deg_results.rds\n",
+    "  • results/data/limma_fit_object.rds\n",
+    "\n",
+    "EXECUTION TIME:\n",
+    "  Total time: ", round(as.numeric(elapsed_time), 2), " minutes\n",
+    "\n",
+    "╔════════════════════════════════════════════════════════════════╗\n",
+    "║                   ANALYSIS COMPLETED                          ║\n",
+    "║              All plots and tables have been saved             ║\n",
+    "║                  Check results/ directory                     ║\n",
+    "╚════════════════════════════════════════════════════════════════╝\n"
+  )
+  
+  cat(report)
+  
+  # Save report to file
+  sink("results/ANALYSIS_REPORT.txt")
+  cat(report)
+  sink()
+  
+  cat("\n✓ Report saved to: results/ANALYSIS_REPORT.txt\n")
+  
+}, error = function(e) {
+  cat("\n\nERROR ENCOUNTERED:\n")
+  cat("Message:", e$message, "\n")
+  cat("\nPlease check the error message above and ensure all dependencies are installed.\n")
+  stop(e)
 })
 
-# Load processed expression and DEG results
-if (!file.exists("results/data/gds5211_processed.rds")) {
-  stop("Processed expression data not found. Run 02_preprocessing_normalization.R first.")
-}
-if (!file.exists("results/data/deg_results_gds5211.rds")) {
-  stop("DEG results not found. Run 03_deg_analysis.R first.")
-}
-
-expr <- readRDS("results/data/gds5211_processed.rds")
-res <- readRDS("results/data/deg_results_gds5211.rds")
-
-# 1. Volcano Plot
-volcano_df <- res %>%
-  mutate(sig = ifelse(adj.P.Val < 0.05 & abs(logFC) > 1, "Significant", "Not Significant"))
-
-p_volcano <- ggplot(volcano_df, aes(x = logFC, y = -log10(P.Value), color = sig)) +
-  geom_point(size = 1.5, alpha = 0.8) +
-  geom_vline(xintercept = c(-1, 1), linetype = "dashed", color = "gray50") +
-  geom_hline(yintercept = -log10(0.05), linetype = "dashed", color = "gray50") +
-  labs(
-    title = "Volcano Plot - GDS5211",
-    x = "log2 Fold Change",
-    y = "-log10(P-value)",
-    color = "Status"
-  ) +
-  theme_minimal(base_size = 12)
-
-ggsave("results/plots/volcano_plot.png", p_volcano, width = 8, height = 6, dpi = 300)
-
-# 2. Heatmap of top DEGs
-sig_genes <- res %>%
-  filter(adj.P.Val < 0.05, abs(logFC) > 1) %>%
-  top_n(50, wt = -adj.P.Val)
-
-if (nrow(sig_genes) > 0) {
-  top_genes <- sig_genes$Gene
-  heatmat <- expr[top_genes, , drop = FALSE]
-  if (nrow(heatmat) > 1 && ncol(heatmat) > 1) {
-    heatmat <- t(scale(t(heatmat)))
-    png("results/plots/heatmap_top_genes.png", width = 1200, height = 1000, res = 150)
-      pheatmap::pheatmap(
-        heatmat,
-        scale = "none",
-        clustering_distance_rows = "euclidean",
-        clustering_distance_cols = "euclidean",
-        main = "Top DEGs Heatmap",
-        color = colorRampPalette(c("navy", "white", "firebrick3"))(50)
-      )
-    dev.off()
-  }
-}
-
-# 3. Boxplot for most significant gene
-if (nrow(res) > 0) {
-  top_gene <- res %>% arrange(P.Value) %>% slice(1) %>% pull(Gene)
-  gene_expr <- as.numeric(expr[top_gene, ])
-  group <- factor(rep(c("Group1", "Group2"), length.out = length(gene_expr)))
-  box_df <- data.frame(Gene = top_gene, Expression = gene_expr, Group = group)
-  p_box <- ggplot(box_df, aes(x = Group, y = Expression, fill = Group)) +
-    geom_boxplot(width = 0.5, alpha = 0.7) +
-    geom_jitter(width = 0.15, size = 1.5) +
-    labs(title = paste("Boxplot for", top_gene), x = "Group", y = "Expression") +
-    theme_minimal(base_size = 12)
-  ggsave("results/plots/boxplot_top_gene.png", p_box, width = 7, height = 6, dpi = 300)
-}
-
-# 4. PCA plot
-pca <- prcomp(t(expr), center = TRUE, scale. = TRUE)
-pca_df <- as.data.frame(pca$x[, 1:2])
-pca_df$Group <- factor(rep(c("Group1", "Group2"), length.out = nrow(pca_df)))
-
-p_pca <- ggplot(pca_df, aes(x = PC1, y = PC2, color = Group)) +
-  geom_point(size = 3) +
-  labs(title = "PCA of GDS5211 Samples", x = "PC1", y = "PC2") +
-  theme_minimal(base_size = 12)
-ggsave("results/plots/pca_plot.png", p_pca, width = 7, height = 6, dpi = 300)
-
-# 5. MA plot
-png("results/plots/ma_plot.png", width = 1000, height = 700, res = 150)
-  limma::plotMA(
-    as.matrix(expr),
-    main = "MA Plot",
-    cex.main = 1.2
-  )
-dev.off()
-
-# 6. Density plot
-p_density <- ggplot(data.frame(Value = as.vector(expr)), aes(x = Value)) +
-  geom_density(alpha = 0.5, fill = "steelblue") +
-  labs(title = "Expression Density", x = "Expression Value", y = "Density") +
-  theme_minimal(base_size = 12)
-ggsave("results/plots/density_plot.png", p_density, width = 7, height = 6, dpi = 300)
-
-cat("Visualization plots saved in results/plots\n")
+cat("\nAnalysis pipeline completed.\n")
